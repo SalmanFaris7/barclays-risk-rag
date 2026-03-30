@@ -8,9 +8,18 @@ logs/
 # Python cache
 __pycache__/
 *.pyc
+*.pdf
 
 # Streamlit cache
 .streamlit/
 
 # Virtual environment (if local)
 venv/
+
+
+#Extra
+data/raw_pdfs/
+barclays-rag/          # virtual environment folder
+.DS_Store
+chroma_db/             # local vector store data
+logs/
