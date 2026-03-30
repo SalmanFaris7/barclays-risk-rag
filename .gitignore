@@ -1,0 +1,16 @@
+# Environment variables
+.env
+
+# Logs
+logs/
+*.log
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Streamlit cache
+.streamlit/
+
+# Virtual environment (if local)
+venv/
