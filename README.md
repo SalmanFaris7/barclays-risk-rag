@@ -15,23 +15,7 @@ built as a prototype for production deployment in a banking environment.
 - Python, LangChain, AWS Bedrock, ChromaDB, Streamlit, RAGAs
 
 ## Architecture
-[you'll add a diagram here later]
+[add a diagram here later]
 
 ## Setup
-[you'll fill this in as you build]
-```
-
----
-
-### What Your Repo Should Look Like After This Step
-```
-barclays-risk-rag/
-├── data/
-│   └── raw_pdfs/        ← local only, gitignored
-├── src/                 ← empty for now, ready for code
-├── app/                 ← empty for now
-├── logs/                ← empty for now
-├── .env                 ← local only, gitignored
-├── .gitignore           ✅ committed
-├── requirements.txt     ✅ committed
-└── README.md            ✅ committed
+[fill this in as you build]
