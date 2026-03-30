@@ -12,7 +12,7 @@ built as a prototype for production deployment in a banking environment.
   for Model Risk Policy compliance
 
 ## Tech Stack
-- Python, LangChain, AWS Bedrock, ChromaDB, Streamlit, RAGAs
+- Python, LangChain, Docling, AWS Bedrock, ChromaDB, Streamlit, RAGAs
 
 ## Architecture
 [add a diagram here later]
