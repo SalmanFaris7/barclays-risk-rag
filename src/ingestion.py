@@ -1,4 +1,7 @@
 from docling.document_converter import DocumentConverter
+from docling.datamodel.base_models import InputFormat
+from docling.datamodel.pipeline_options import PdfPipelineOptions, AcceleratorDevice
+from docling.document_converter import PdfFormatOption
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pathlib import Path
 import json
@@ -8,7 +11,24 @@ def load_documents_with_docling(pdf_folder: str) -> list:
     Load and parse all PDFs in a folder using Docling.
     Returns a list of dicts with text content and metadata.
     """
-    converter = DocumentConverter()
+
+    # Build PDF pipeline options (lower DPI, use lightweight layout model)
+    pdf_opts = PdfFormatOption(
+        pipeline_options=PdfPipelineOptions(
+            # common option names to try:
+            layout_model_name="docling-project/docling-layout-tiny",
+            #images_scale=1.0,
+            do_ocr=False,
+            generate_page_images=False,
+            generate_picture_images=False
+        )
+    )
+
+    format_options = {
+        InputFormat.PDF: pdf_opts
+    }
+
+    converter = DocumentConverter(format_options=format_options)
     documents = []
     pdf_paths = list(Path(pdf_folder).glob("*.pdf"))
 
