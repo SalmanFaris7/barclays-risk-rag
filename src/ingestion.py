@@ -81,7 +81,7 @@ if __name__ == "__main__":
     chunks = chunk_documents(raw_docs)
 
     # Save chunks to inspect before embedding
-    with open("data/chunks_preview.json", "w") as f:
-        json.dump(chunks[:10], f, indent=2)
+    with open("data/chunks.json", "w") as f:
+        json.dump(chunks, f, indent=2)
     
-    print("Preview saved to data/chunks_preview.json")
+    print(f"✅ All chunks saved to data/chunks_preview.json")
