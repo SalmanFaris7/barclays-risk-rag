@@ -8,6 +8,22 @@ from llm import answer_query
 import json
 from pathlib import Path
 
+# Works both locally (.env) and in production (Streamlit secrets)
+def load_secrets():
+    try:
+        # Production — Streamlit Cloud
+        os.environ["AWS_ACCESS_KEY_ID"] = st.secrets["AWS_ACCESS_KEY_ID"]
+        os.environ["AWS_SECRET_ACCESS_KEY"] = st.secrets["AWS_SECRET_ACCESS_KEY"]
+        os.environ["AWS_REGION"] = st.secrets["AWS_REGION"]
+        os.environ["DEEPSEEK_API_KEY"] = st.secrets["DEEPSEEK_API_KEY"]
+        os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
+    except:
+        # Local — falls back to .env
+        from dotenv import load_dotenv
+        load_dotenv()
+
+load_secrets()
+
 # ── Page config ──────────────────────────────────────────────
 st.set_page_config(
     page_title="Credit Risk Intelligence",

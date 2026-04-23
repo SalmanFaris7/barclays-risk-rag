@@ -21,5 +21,5 @@ venv/
 data/raw_pdfs/
 barclays-rag/          # virtual environment folder
 .DS_Store
-chroma_db/             # local vector store data
+#chroma_db/             # local vector store data
 logs/
