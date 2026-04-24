@@ -1,20 +1,14 @@
 from openai import OpenAI
-import os
+import boto3
 import json
+import os
 from dotenv import load_dotenv
 from datetime import datetime, timezone
 from retriever import load_retriever, retrieve
 
 load_dotenv()
 
-# Confidence threshold
 CONFIDENCE_THRESHOLD = 0.25
-
-# DeepSeek client — uses OpenAI-compatible SDK
-client = OpenAI(
-    api_key=os.getenv("DEEPSEEK_API_KEY"),
-    base_url="https://api.deepseek.com"
-)
 
 SYSTEM_PROMPT = """You are a senior credit risk analyst at a major UK bank.
 You answer questions strictly based on the provided document excerpts.
@@ -39,10 +33,31 @@ QUESTION:
 ANSWER:"""
 
 
+def call_bedrock(prompt: str) -> str:
+    """PRIMARY — AWS Bedrock Claude 3 Sonnet"""
+    client = boto3.client(
+        service_name="bedrock-runtime",
+        region_name=os.getenv("AWS_REGION", "eu-west-2")
+    )
+    body = json.dumps({
+        "anthropic_version": "bedrock-2023-05-31",
+        "max_tokens": 1024,
+        "system": SYSTEM_PROMPT,
+        "messages": [{"role": "user", "content": prompt}]
+    })
+    response = client.invoke_model(
+        modelId="anthropic.claude-3-sonnet-20240229-v1:0",
+        body=body
+    )
+    return json.loads(response["body"].read())["content"][0]["text"]
+
+
 def call_deepseek(prompt: str) -> str:
-    """
-    Call DeepSeek API using OpenAI-compatible SDK
-    """
+    """FALLBACK 1 — DeepSeek"""
+    client = OpenAI(
+        api_key=os.getenv("DEEPSEEK_API_KEY"),
+        base_url="https://api.deepseek.com"
+    )
     response = client.chat.completions.create(
         model="deepseek-chat",
         messages=[
@@ -50,21 +65,61 @@ def call_deepseek(prompt: str) -> str:
             {"role": "user", "content": prompt}
         ],
         max_tokens=1024,
-        temperature=0.0  # Keep deterministic for risk use case
+        temperature=0.0
     )
     return response.choices[0].message.content
 
 
-def log_query(query: str, answer: str, sources: list, confidence: float):
+def call_openai(prompt: str) -> str:
+    """FALLBACK 2 — OpenAI GPT-4o"""
+    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": prompt}
+        ],
+        max_tokens=1024,
+        temperature=0.0
+    )
+    return response.choices[0].message.content
+
+
+def call_llm_with_fallback(prompt: str) -> tuple:
     """
-    Audit log every query for Model Risk compliance
+    Try each LLM in order. Returns (answer, provider_used).
+    Bedrock → DeepSeek → OpenAI
     """
+    providers = [
+        ("AWS Bedrock", call_bedrock),
+        ("DeepSeek",    call_deepseek),
+        ("OpenAI",      call_openai),
+    ]
+
+    for provider_name, call_fn in providers:
+        try:
+            print(f"  Trying {provider_name}...")
+            answer = call_fn(prompt)
+            print(f"  ✅ Success with {provider_name}")
+            return answer, provider_name
+        except Exception as e:
+            print(f"  ⚠️ {provider_name} failed: {e}. Trying next fallback...")
+
+    return (
+        "❌ All LLM providers failed. Please check your API keys and connectivity.",
+        "None"
+    )
+
+
+def log_query(query: str, answer: str, sources: list, confidence: float, provider: str):
+    """Audit log for Model Risk compliance"""
     os.makedirs("logs", exist_ok=True)
     log_entry = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "query": query,
         "confidence": confidence,
         "sources": sources,
+        "provider_used": provider,
         "answer": answer
     }
     with open("logs/query_log.jsonl", "a") as f:
@@ -72,9 +127,8 @@ def log_query(query: str, answer: str, sources: list, confidence: float):
 
 
 def answer_query(query: str, model, collection) -> dict:
-    """
-    Full RAG pipeline: retrieve → guardrail → generate → log
-    """
+    """Full RAG pipeline: retrieve → guardrail → generate → log"""
+
     # Step 1 — Retrieve
     retrieval = retrieve(query, model, collection)
     confidence = retrieval["confidence"]
@@ -87,25 +141,27 @@ def answer_query(query: str, model, collection) -> dict:
             "⚠️ Insufficient information in the available documents "
             "to answer this question reliably. Please consult source documents directly."
         )
-        log_query(query, answer, sources, confidence)
+        log_query(query, answer, sources, confidence, provider="Guardrail")
         return {
             "answer": answer,
             "sources": sources,
             "confidence": confidence,
+            "provider_used": "Guardrail",
             "guardrail_triggered": True
         }
 
-    # Step 3 — Generate
+    # Step 3 — Generate with fallback chain
     prompt = build_prompt(query, chunks)
-    answer = call_deepseek(prompt)
+    answer, provider = call_llm_with_fallback(prompt)
 
     # Step 4 — Log
-    log_query(query, answer, sources, confidence)
+    log_query(query, answer, sources, confidence, provider)
 
     return {
         "answer": answer,
         "sources": sources,
         "confidence": confidence,
+        "provider_used": provider,
         "guardrail_triggered": False
     }
 
@@ -124,6 +180,7 @@ if __name__ == "__main__":
         print(f"Query: {query}")
         result = answer_query(query, model, collection)
         print(f"Confidence: {result['confidence']}")
+        print(f"Provider used: {result['provider_used']}")
         print(f"Guardrail triggered: {result['guardrail_triggered']}")
         print(f"Sources: {result['sources']}")
         print(f"\nAnswer:\n{result['answer']}")
